@@ -21,7 +21,12 @@ public class TruenoNPCApi {
      **/
 
     private static String version;
+    private static Plugin plugin;
     private static ArrayList<TruenoNPC> npcs = new ArrayList<TruenoNPC>();
+
+    public static Plugin getPlugin(){
+        return plugin;
+    }
 
     private static void setupVersion(){
         try {
@@ -49,6 +54,7 @@ public class TruenoNPCApi {
      */
 
     public static TruenoNPC createNPC(Plugin plugin, Location location, String skin){
+        TruenoNPCApi.plugin = plugin;
         if(version==null){
             setupVersion();
         }

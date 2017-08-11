@@ -16,5 +16,5 @@ public interface TruenoNPC {
     Location getLocation();
     int getEntityID();
     boolean isDeleted();
-
+    int getNpcID();
 }

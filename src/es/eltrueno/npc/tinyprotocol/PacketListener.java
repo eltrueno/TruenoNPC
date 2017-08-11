@@ -1,6 +1,5 @@
 package es.eltrueno.npc.tinyprotocol;
 
-import es.eltrueno.deliveryman.main;
 import es.eltrueno.npc.TruenoNPC;
 import es.eltrueno.npc.TruenoNPCApi;
 import es.eltrueno.npc.event.TruenoNPCInteractEvent;
@@ -36,7 +35,7 @@ public class PacketListener {
                                 }
                             }
                             playerswhointeract.add(sender);
-                            Bukkit.getScheduler().runTaskLaterAsynchronously(main.getPlugin(), new Runnable(){
+                            Bukkit.getScheduler().runTaskLaterAsynchronously(TruenoNPCApi.getPlugin(), new Runnable(){
                                 @Override
                                 public void run() {
                                     playerswhointeract.remove(sender);

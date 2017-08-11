@@ -48,22 +48,15 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
                 @Override
                 public void run() {
                     for(TruenoNPC_v1_8_r3 nmsnpc : npcs){
-                        TruenoNPC npc = (TruenoNPC)nmsnpc;
                         for(Player pl : Bukkit.getOnlinePlayers()){
                             if(nmsnpc.location.getWorld().equals(pl.getWorld())){
                                 if(nmsnpc.location.distance(pl.getLocation())>60 && nmsnpc.rendered.contains(pl)){
                                     nmsnpc.destroy(pl);
-                                    TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(pl, npc);
-                                    Bukkit.getPluginManager().callEvent(event);
                                 }else if(nmsnpc.location.distance(pl.getLocation())<60 && !nmsnpc.rendered.contains(pl)){
                                     nmsnpc.spawn(pl);
-                                    TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(pl, npc);
-                                    Bukkit.getPluginManager().callEvent(event);
                                 }
                             }else{
                                 nmsnpc.destroy(pl);
-                                TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(pl, npc);
-                                Bukkit.getPluginManager().callEvent(event);
                             }
                         }
                     }
@@ -93,11 +86,6 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
         ((CraftPlayer)player).getHandle().playerConnection.sendPacket(packet);
     }
 
-    private void sendPacket(Packet<?> packet){
-        for(Player player : Bukkit.getOnlinePlayers()){
-            sendPacket(packet,player);
-        }
-    }
 
     @Override
     public Location getLocation(){
@@ -112,6 +100,11 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
     @Override
     public boolean isDeleted(){
         return deleted;
+    }
+
+    @Override
+    public int getNpcID(){
+        return npcid;
     }
 
     public TruenoNPC_v1_8_r3(Location location, String skin){
@@ -170,12 +163,8 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
             }
         },13);
         rendered.add(p);
-    }
-
-    private void spawn(){
-        for(Player pl : Bukkit.getOnlinePlayers()){
-            spawn(pl);
-        }
+        TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(p, (TruenoNPC) this);
+        Bukkit.getPluginManager().callEvent(event);
     }
 
     private void destroy(Player p){
@@ -194,14 +183,10 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
             f2.setAccessible(false);
             ((CraftPlayer) p).getHandle().playerConnection.sendPacket(removescbpacket);
             rendered.remove(p);
+            TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(p, (TruenoNPC) this);
+            Bukkit.getPluginManager().callEvent(event);
         }catch(Exception ex){
             ex.printStackTrace();
-        }
-    }
-
-    private void destroy(){
-        for(Player pl : Bukkit.getOnlinePlayers()){
-            destroy(pl);
         }
     }
 

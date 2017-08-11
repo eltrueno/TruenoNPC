@@ -50,22 +50,15 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
                 @Override
                 public void run() {
                     for(TruenoNPC_v1_11_r1 nmsnpc : npcs){
-                        TruenoNPC npc = (TruenoNPC)nmsnpc;
                         for(Player pl : Bukkit.getOnlinePlayers()){
                             if(nmsnpc.location.getWorld().equals(pl.getWorld())){
                                 if(nmsnpc.location.distance(pl.getLocation())>60 && nmsnpc.rendered.contains(pl)){
                                     nmsnpc.destroy(pl);
-                                    TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(pl, npc);
-                                    Bukkit.getPluginManager().callEvent(event);
                                 }else if(nmsnpc.location.distance(pl.getLocation())<60 && !nmsnpc.rendered.contains(pl)){
                                     nmsnpc.spawn(pl);
-                                    TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(pl, npc);
-                                    Bukkit.getPluginManager().callEvent(event);
                                 }
                             }else{
                                 nmsnpc.destroy(pl);
-                                TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(pl, npc);
-                                Bukkit.getPluginManager().callEvent(event);
                             }
                         }
                     }
@@ -83,23 +76,8 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
         }catch(Exception e){}
     }
 
-    private Object getValue(Object obj,String name){
-        try{
-            Field field = obj.getClass().getDeclaredField(name);
-            field.setAccessible(true);
-            return field.get(obj);
-        }catch(Exception e){}
-        return null;
-    }
-
     private void sendPacket(Packet<?> packet, Player player){
         ((CraftPlayer)player).getHandle().playerConnection.sendPacket(packet);
-    }
-
-    private void sendPacket(Packet<?> packet){
-        for(Player player : Bukkit.getOnlinePlayers()){
-            sendPacket(packet,player);
-        }
     }
 
     @Override
@@ -115,6 +93,11 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
     @Override
     public boolean isDeleted(){
         return deleted;
+    }
+
+    @Override
+    public int getNpcID(){
+        return npcid;
     }
 
     public TruenoNPC_v1_11_r1(Location location, String skin){
@@ -143,7 +126,6 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
         PacketPlayOutNamedEntitySpawn spawnpacket = new PacketPlayOutNamedEntitySpawn(npcentity);
         DataWatcher watcher = npcentity.getDataWatcher();
         watcher.set(new DataWatcherObject<>(13, DataWatcherRegistry.a), (byte) 0xFF);
-        //watcher.set(DataWatcherRegistry.a.a(12), (byte) 127F);
         setValue(spawnpacket, "h", watcher);
 
         PacketPlayOutScoreboardTeam scbpacket = new PacketPlayOutScoreboardTeam();
@@ -174,13 +156,10 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
             }
         },26);
         rendered.add(p);
+        TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(p, (TruenoNPC) this);
+        Bukkit.getPluginManager().callEvent(event);
     }
 
-    private void spawn(){
-        for(Player pl : Bukkit.getOnlinePlayers()){
-            spawn(pl);
-        }
-    }
 
     private void destroy(Player p){
         PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(new int[] {entityID});
@@ -192,14 +171,10 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
             setValue(removescbpacket,"i", 1);
             sendPacket(removescbpacket, p);
             rendered.remove(p);
+            TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(p, (TruenoNPC) this);
+            Bukkit.getPluginManager().callEvent(event);
         }catch(Exception ex){
             ex.printStackTrace();
-        }
-    }
-
-    private void destroy(){
-        for(Player pl : Bukkit.getOnlinePlayers()){
-            destroy(pl);
         }
     }
 
