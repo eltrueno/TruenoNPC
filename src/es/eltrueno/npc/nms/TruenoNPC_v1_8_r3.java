@@ -120,6 +120,9 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
     @Override
     public void delete(){
         npcs.remove(this);
+        for(Player p : Bukkit.getOnlinePlayers()) {
+            destroy(p);
+        }
         this.deleted = true;
     }
 
@@ -161,7 +164,7 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
             public void run() {
                 rmvFromTablist(p);
             }
-        },13);
+        },26);
         rendered.add(p);
         TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(p, (TruenoNPC) this);
         Bukkit.getPluginManager().callEvent(event);

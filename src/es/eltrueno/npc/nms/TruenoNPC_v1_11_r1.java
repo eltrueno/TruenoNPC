@@ -113,6 +113,9 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
     @Override
     public void delete(){
         npcs.remove(this);
+        for(Player p : Bukkit.getOnlinePlayers()) {
+            destroy(p);
+        }
         this.deleted = true;
     }
 
