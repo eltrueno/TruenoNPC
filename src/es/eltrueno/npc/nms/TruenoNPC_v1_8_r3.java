@@ -17,6 +17,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Random;
 
 public class TruenoNPC_v1_8_r3 implements TruenoNPC {
 
@@ -30,7 +31,7 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
 
     private static List<TruenoNPC_v1_8_r3> npcs = new ArrayList<TruenoNPC_v1_8_r3>();
     private static int id = 0;
-    private static boolean taststarted = false;
+    private static boolean taskstarted = false;
     private static Plugin plugin;
     private PacketPlayOutScoreboardTeam scbpacket;
     private boolean deleted = false;
@@ -41,8 +42,8 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
     private List<Player> rendered = new ArrayList<Player>();
 
     public static void startTask(Plugin plugin){
-        if(!taststarted){
-            taststarted = true;
+        if(!taskstarted){
+            taskstarted = true;
             TruenoNPC_v1_8_r3.plugin = plugin;
             Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, new Runnable() {
                 @Override
@@ -107,10 +108,25 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
         return npcid;
     }
 
+    private String getRandomString (int lenght){
+        String randStr = "";
+        long milis = new java.util.GregorianCalendar().getTimeInMillis();
+        Random r = new Random(milis);
+        int i = 0;
+        while ( i < lenght){
+            char c = (char)r.nextInt(255);
+            if ( (c >= '0' && c <='9') || (c >='A' && c <='Z') ){
+                randStr += c;
+                i ++;
+            }
+        }
+        return randStr;
+    }
+
     public TruenoNPC_v1_8_r3(Location location, String skin){
         entityID = (int)Math.ceil(Math.random() * 1000) + 2000;
         npcid = id++;
-        gameprofile = GameProfileUtils.getGameProfileFromName(skin,"npc"+npcid);
+        gameprofile = GameProfileUtils.getGameProfileFromName(skin,getRandomString(8));
         this.location = location;
         if(!npcs.contains(this)){
             npcs.add(this);
