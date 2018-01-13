@@ -41,15 +41,15 @@ public class TruenoNPCApi {
         if (version.equals("v1_8_R3")) {
             TruenoNPC_v1_8_r3.removeCacheFile();
         }else if (version.equals("v1_9_R1")) {
-            TruenoNPC_v1_8_r3.removeCacheFile();
+            TruenoNPC_v1_9_r1.removeCacheFile();
         }else if (version.equals("v1_9_R2")) {
-            TruenoNPC_v1_8_r3.removeCacheFile();
+            TruenoNPC_v1_9_r2.removeCacheFile();
         }else if (version.equals("v1_10_R1")) {
-            TruenoNPC_v1_8_r3.removeCacheFile();
+            TruenoNPC_v1_10_r1.removeCacheFile();
         }else if (version.equals("v1_11_R1")) {
-            TruenoNPC_v1_8_r3.removeCacheFile();
+            TruenoNPC_v1_11_r1.removeCacheFile();
         }else if (version.equals("v1_12_R1")) {
-            TruenoNPC_v1_8_r3.removeCacheFile();
+            TruenoNPC_v1_12_r1.removeCacheFile();
         }
     }
 
