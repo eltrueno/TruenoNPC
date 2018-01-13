@@ -13,13 +13,12 @@ import es.eltrueno.npc.event.TruenoNPCSpawnEvent;
 import es.eltrueno.npc.skin.SkinData;
 import es.eltrueno.npc.skin.SkinDataReply;
 import es.eltrueno.npc.skin.TruenoNPCSkin;
-import es.eltrueno.npc.utils.GameProfileUtils;
-import net.minecraft.server.v1_9_R2.*;
+import net.minecraft.server.v1_10_R1.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.craftbukkit.v1_9_R2.CraftServer;
-import org.bukkit.craftbukkit.v1_9_R2.CraftWorld;
-import org.bukkit.craftbukkit.v1_9_R2.entity.CraftPlayer;
+import org.bukkit.craftbukkit.v1_10_R1.CraftServer;
+import org.bukkit.craftbukkit.v1_10_R1.CraftWorld;
+import org.bukkit.craftbukkit.v1_10_R1.entity.CraftPlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 

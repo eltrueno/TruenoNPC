@@ -13,7 +13,6 @@ import es.eltrueno.npc.event.TruenoNPCSpawnEvent;
 import es.eltrueno.npc.skin.SkinData;
 import es.eltrueno.npc.skin.SkinDataReply;
 import es.eltrueno.npc.skin.TruenoNPCSkin;
-import es.eltrueno.npc.utils.GameProfileUtils;
 import net.minecraft.server.v1_9_R1.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
