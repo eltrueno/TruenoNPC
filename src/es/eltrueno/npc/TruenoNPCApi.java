@@ -1,6 +1,7 @@
 package es.eltrueno.npc;
 
 import es.eltrueno.npc.nms.*;
+import es.eltrueno.npc.skin.TruenoNPCSkin;
 import es.eltrueno.npc.tinyprotocol.PacketListener;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -36,6 +37,22 @@ public class TruenoNPCApi {
         }
     }
 
+    public static void removeCacheFile(){
+        if (version.equals("v1_8_R3")) {
+            TruenoNPC_v1_8_r3.removeCacheFile();
+        }else if (version.equals("v1_9_R1")) {
+            TruenoNPC_v1_8_r3.removeCacheFile();
+        }else if (version.equals("v1_9_R2")) {
+            TruenoNPC_v1_8_r3.removeCacheFile();
+        }else if (version.equals("v1_10_R1")) {
+            TruenoNPC_v1_8_r3.removeCacheFile();
+        }else if (version.equals("v1_11_R1")) {
+            TruenoNPC_v1_8_r3.removeCacheFile();
+        }else if (version.equals("v1_12_R1")) {
+            TruenoNPC_v1_8_r3.removeCacheFile();
+        }
+    }
+
     public static ArrayList<TruenoNPC> getNPCs(){
         ArrayList<TruenoNPC> list = new ArrayList<TruenoNPC>();
         for(TruenoNPC npc : npcs){
@@ -53,7 +70,7 @@ public class TruenoNPCApi {
      * @param skin NPC skin ussing a playername
      */
 
-    public static TruenoNPC createNPC(Plugin plugin, Location location, String skin){
+    public static TruenoNPC createNPC(Plugin plugin, Location location, TruenoNPCSkin skin){
         TruenoNPCApi.plugin = plugin;
         if(version==null){
             setupVersion();
@@ -99,6 +116,5 @@ public class TruenoNPCApi {
             return null;
         }
     }
-
 
 }
