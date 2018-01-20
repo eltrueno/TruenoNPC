@@ -114,7 +114,7 @@ public class TruenoNPC_v1_12_r1 implements TruenoNPC {
 
     private String getRandomString (int lenght){
         String randStr = "";
-        long milis = new java.util.GregorianCalendar().getTimeInMillis();
+        long milis = new GregorianCalendar().getTimeInMillis();
         Random r = new Random(milis);
         int i = 0;
         while ( i < lenght){
@@ -295,8 +295,8 @@ public class TruenoNPC_v1_12_r1 implements TruenoNPC {
             Collection<String> plys = Lists.newArrayList();
             plys.add(gameprofile.getName());
             setValue(scbpacket, "i",0);
-            setValue(scbpacket, "b",gameprofile.getName());
-            setValue(scbpacket, "a",gameprofile.getName());
+            setValue(scbpacket, "b",profile.getName());
+            setValue(scbpacket, "a",profile.getName());
             setValue(scbpacket, "e","never");
             setValue(scbpacket, "j",1);
             setValue(scbpacket, "h", plys);

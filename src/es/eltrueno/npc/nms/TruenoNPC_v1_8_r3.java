@@ -119,7 +119,7 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
 
     private String getRandomString (int lenght){
         String randStr = "";
-        long milis = new java.util.GregorianCalendar().getTimeInMillis();
+        long milis = new GregorianCalendar().getTimeInMillis();
         Random r = new Random(milis);
         int i = 0;
         while ( i < lenght){

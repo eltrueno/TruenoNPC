@@ -114,7 +114,7 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
 
     private String getRandomString (int lenght){
         String randStr = "";
-        long milis = new java.util.GregorianCalendar().getTimeInMillis();
+        long milis = new GregorianCalendar().getTimeInMillis();
         Random r = new Random(milis);
         int i = 0;
         while ( i < lenght){
@@ -282,12 +282,12 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
         MinecraftServer nmsServer = ((CraftServer) Bukkit.getServer()).getServer();
         WorldServer nmsWorld = ((CraftWorld) getLocation().getWorld()).getHandle();
         EntityPlayer npcentity = new EntityPlayer(nmsServer, nmsWorld, gameprofile, new PlayerInteractManager(nmsWorld));
-        npcentity.setLocation(location.getX(),location.getY(),location.getZ(),location.getYaw(),location.getPitch());
+        npcentity.setLocation(location.getX(),location.getY(),location.getZ(),(byte)location.getYaw(),(byte)location.getPitch());
         this.entityID = npcentity.getId();
         this.npcentity = npcentity;
         PacketPlayOutNamedEntitySpawn spawnpacket = new PacketPlayOutNamedEntitySpawn(npcentity);
         DataWatcher watcher = npcentity.getDataWatcher();
-        watcher.set(new DataWatcherObject<>(12, DataWatcherRegistry.a), (byte) 0xFF);
+        watcher.set(new DataWatcherObject<>(13, DataWatcherRegistry.a), (byte) 0xFF);
         setValue(spawnpacket, "h", watcher);
 
         PacketPlayOutScoreboardTeam scbpacket = new PacketPlayOutScoreboardTeam();
@@ -295,8 +295,8 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
             Collection<String> plys = Lists.newArrayList();
             plys.add(gameprofile.getName());
             setValue(scbpacket, "i",0);
-            setValue(scbpacket, "b",gameprofile.getName());
-            setValue(scbpacket, "a",gameprofile.getName());
+            setValue(scbpacket, "b",profile.getName());
+            setValue(scbpacket, "a",profile.getName());
             setValue(scbpacket, "e","never");
             setValue(scbpacket, "j",1);
             setValue(scbpacket, "h", plys);
