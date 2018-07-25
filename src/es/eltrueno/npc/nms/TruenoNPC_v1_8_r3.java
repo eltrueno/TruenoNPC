@@ -9,6 +9,7 @@ import com.mojang.authlib.properties.Property;
 import es.eltrueno.npc.TruenoNPC;
 import es.eltrueno.npc.event.TruenoNPCDespawnEvent;
 import es.eltrueno.npc.event.TruenoNPCSpawnEvent;
+import es.eltrueno.npc.skin.JsonSkinData;
 import es.eltrueno.npc.skin.SkinData;
 import es.eltrueno.npc.skin.SkinDataReply;
 import es.eltrueno.npc.skin.TruenoNPCSkin;
@@ -49,6 +50,7 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
     private GameProfile gameprofile;
     private TruenoNPCSkin skin;
     private List<Player> rendered = new ArrayList<Player>();
+    private List<Player> waiting = new ArrayList<Player>();
 
     public static void startTask(Plugin plugin){
         if(!taskstarted){
@@ -63,7 +65,10 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
                                 if(nmsnpc.location.distance(pl.getLocation())>60 && nmsnpc.rendered.contains(pl)){
                                     nmsnpc.destroy(pl);
                                 }else if(nmsnpc.location.distance(pl.getLocation())<60 && !nmsnpc.rendered.contains(pl)){
-                                    nmsnpc.spawn(pl);
+                                    if(!nmsnpc.waiting.contains(pl)){
+                                        nmsnpc.waiting.add(pl);
+                                        nmsnpc.spawn(pl);
+                                    }
                                 }
                             }else{
                                 nmsnpc.destroy(pl);
@@ -153,17 +158,26 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
         }
     }
 
-    private SkinData getCachedSkin(){
+    private JsonSkinData getCachedSkin(){
         JsonObject jsonFile = getChacheFile(plugin);
-        JsonArray oldskindata = jsonFile.getAsJsonArray("skindata");
-        Iterator it = oldskindata.iterator();
-        SkinData skin = null;
-        while(it.hasNext()){
-            JsonElement element = (JsonElement) it.next();
-            if(element.getAsJsonObject().get("id").getAsInt()==this.npcid){
-                String value = element.getAsJsonObject().get("value").getAsString();
-                String signature = element.getAsJsonObject().get("signature").getAsString();
-                skin = new SkinData(value, signature);
+        JsonArray skindata = null;
+        try{
+            skindata = jsonFile.getAsJsonArray("skindata");
+        }catch(Exception ex){
+
+        }
+        JsonSkinData skin = null;
+        if(skindata!=null){
+            Iterator it = skindata.iterator();
+            while(it.hasNext()){
+                JsonElement element = (JsonElement) it.next();
+                if(element.getAsJsonObject().get("id").getAsInt()==this.npcid){
+                    String value = element.getAsJsonObject().get("value").getAsString();
+                    String signature = element.getAsJsonObject().get("signature").getAsString();
+                    long updated = element.getAsJsonObject().get("updated").getAsLong();
+                    SkinData data = new SkinData(value, signature);
+                    skin = new JsonSkinData(data, updated);
+                }
             }
         }
         return skin;
@@ -188,9 +202,11 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
             }
         }
         JsonObject skin = new JsonObject();
+        Date actualdate = new Date();
         skin.addProperty("id", this.npcid);
         skin.addProperty("value", skindata.getValue());
         skin.addProperty("signature", skindata.getSignature());
+        skin.addProperty("updated", actualdate.getTime());
         newskindata.add(skin);
 
         JsonObject obj = new JsonObject();
@@ -262,27 +278,34 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
     }
 
     private void spawn(Player p){
-        this.skin.getSkinDataAsync(new SkinDataReply() {
-            @Override
-            public void done(SkinData skinData) {
-                GameProfile profile = getGameProfile(getRandomString(8), skinData);
-                if(skinData!=null){
-                    setGameProfile(profile);
-                    cacheSkin(skinData);
+        Date actualdate = new Date();
+        JsonSkinData cachedskin = getCachedSkin();
+        if(cachedskin==null || (((actualdate.getTime())-(getCachedSkin().getTimeUpdated())) >= 900000)){
+            this.skin.getSkinDataAsync(new SkinDataReply() {
+                @Override
+                public void done(SkinData skinData) {
+                    GameProfile profile = getGameProfile(getRandomString(8), skinData);
+                    if(skinData!=null){
+                        setGameProfile(profile);
+                        cacheSkin(skinData);
+                        spawnEnttity(p, skinData);
+                    }else{
+                        profile = getGameProfile(getRandomString(8), cachedskin.getSkinData());
+                        setGameProfile(profile);
+                        spawnEnttity(p, cachedskin.getSkinData());
+                    }
                 }
-                spawnEnttity(p, profile, skinData);
-            }
-        });
+            });
+        }else{
+            //SI LA SKIN CACHEADA ES VALIDA
+            GameProfile profile = getGameProfile(getRandomString(8), cachedskin.getSkinData());
+            setGameProfile(profile);
+            spawnEnttity(p, cachedskin.getSkinData());
+        }
     }
 
-    private void spawnEnttity(Player p, GameProfile gameprofile, SkinData skindata){
-        GameProfile profile = gameprofile;
-        if(skindata==null && this.gameprofile!=null){
-            profile = this.gameprofile;
-        }else if(getCachedSkin()!=null){
-            profile = getGameProfile(getRandomString(8), getCachedSkin());
-            setGameProfile(profile);
-        }
+    private void spawnEnttity(Player p, SkinData skindata){
+        GameProfile profile = this.gameprofile;
         PacketPlayOutNamedEntitySpawn packet = new PacketPlayOutNamedEntitySpawn();
 
         setValue(packet, "a", entityID);
@@ -321,7 +344,8 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
                 rmvFromTablist(p);
             }
         },26);
-        rendered.add(p);
+        this.rendered.add(p);
+        this.waiting.remove(p);
         TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(p, (TruenoNPC) this);
         Bukkit.getPluginManager().callEvent(event);
     }
@@ -341,7 +365,7 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
             f2.set(removescbpacket, 1);
             f2.setAccessible(false);
             ((CraftPlayer) p).getHandle().playerConnection.sendPacket(removescbpacket);
-            rendered.remove(p);
+            this.rendered.remove(p);
             TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(p, (TruenoNPC) this);
             Bukkit.getPluginManager().callEvent(event);
         }catch(Exception ex){

@@ -2,26 +2,21 @@ package es.eltrueno.npc.skin;
 
 public class JsonSkinData {
 
-    private int id;
-    private String value;
-    private String signature;
+    private SkinData skindata;
+    private long updated;
 
-    public JsonSkinData(int id, String value, String signature) {
-        this.id = id;
-        this.value = value;
-        this.signature = signature;
+    public JsonSkinData(SkinData skindata, long updated){
+        this.skindata = skindata;
+        this.updated = updated;
     }
 
-    public String getValue() {
-        return value;
+    public SkinData getSkinData() {
+        return skindata;
     }
 
-    public String getSignature() {
-        return signature;
+    public long getTimeUpdated() {
+        return updated;
     }
-
-    public int getID(){
-        return this.id;
-    }
-
 }
+
+
