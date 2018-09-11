@@ -27,7 +27,7 @@ https://github.com/aadnk/ProtocolLib/tree/master/modules/TinyProtocol
 ## Donate me
 If you like my work, please, consider donating 
 
-[![](https://www.paypalobjects.com/es_ES/ES/i/btn/btn_donate_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=86Q4P2PSKP4VG)
+[![](https://i.imgur.com/GMqXvEZ.png?1)](https://www.paypal.me/eltrueno)
 
 ## Contact me
 
