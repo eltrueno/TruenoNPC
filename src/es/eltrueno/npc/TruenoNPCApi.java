@@ -24,9 +24,18 @@ public class TruenoNPCApi {
     private static String version;
     private static Plugin plugin;
     private static ArrayList<TruenoNPC> npcs = new ArrayList<TruenoNPC>();
+    private static Boolean cache = true;
 
     public static Plugin getPlugin(){
         return plugin;
+    }
+
+    public static Boolean getCache(){
+        return cache;
+    }
+
+    public static void useCache(boolean bol){
+        cache = bol;
     }
 
     private static void setupVersion(){

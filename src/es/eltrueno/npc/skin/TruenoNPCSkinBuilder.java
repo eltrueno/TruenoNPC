@@ -16,4 +16,8 @@ public class TruenoNPCSkinBuilder {
         return new TruenoNPCSkin(plugin, SkinType.MINESKINID, String.valueOf(mineskinid));
     }
 
+    public static TruenoNPCSkin fromPlayer(Plugin plugin){
+        return new TruenoNPCSkin(plugin, SkinType.PLAYER);
+    }
+
 }

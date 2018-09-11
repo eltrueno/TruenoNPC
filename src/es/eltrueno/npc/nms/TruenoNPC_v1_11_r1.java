@@ -8,12 +8,11 @@ import com.google.gson.JsonParser;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import es.eltrueno.npc.TruenoNPC;
+import es.eltrueno.npc.TruenoNPCApi;
 import es.eltrueno.npc.event.TruenoNPCDespawnEvent;
 import es.eltrueno.npc.event.TruenoNPCSpawnEvent;
-import es.eltrueno.npc.skin.JsonSkinData;
-import es.eltrueno.npc.skin.SkinData;
-import es.eltrueno.npc.skin.SkinDataReply;
-import es.eltrueno.npc.skin.TruenoNPCSkin;
+import es.eltrueno.npc.skin.*;
+import es.eltrueno.npc.utils.StringUtils;
 import net.minecraft.server.v1_11_R1.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -46,13 +45,13 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
     private static Plugin plugin;
     private boolean deleted = false;
     private int npcid;
-    private int entityID;
-    private EntityPlayer npcentity;
     private Location location;
     private GameProfile gameprofile;
     private TruenoNPCSkin skin;
     private List<Player> rendered = new ArrayList<Player>();
     private List<Player> waiting = new ArrayList<Player>();
+    private HashMap<Player, EntityPlayer> player_entity = new HashMap<Player, EntityPlayer>();
+    private HashMap<Player, SkinData> player_cache = new HashMap<Player, SkinData>();
 
     public static void startTask(Plugin plugin){
         if(!taskstarted){
@@ -79,9 +78,19 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
                     }
                 }
             },0,30);
+
+            Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, new Runnable() {
+                @Override
+                public void run() {
+                    for(TruenoNPC_v1_11_r1 nmsnpc : npcs) {
+                        for (Player pl : Bukkit.getOnlinePlayers()) {
+                            nmsnpc.destroy(pl);
+                        }
+                    }
+                }
+            },20*(60*5),20*(60*5));
         }
     }
-
 
     private void setValue(Object obj,String name,Object value){
         try{
@@ -104,8 +113,12 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
     }
 
     @Override
-    public int getEntityID(){
-        return this.entityID;
+    public int getEntityID(Player p){
+        if(player_entity.get(p)!=null){
+            return player_entity.get(p).getId();
+        }else{
+            return -1;
+        }
     }
 
     @Override
@@ -155,68 +168,69 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
     }
 
     private JsonSkinData getCachedSkin(){
-        JsonObject jsonFile = getChacheFile(plugin);
-        JsonArray skindata = null;
-        try{
-            skindata = jsonFile.getAsJsonArray("skindata");
-        }catch(Exception ex){
+        if(TruenoNPCApi.getCache() && this.skin.getSkinType()!= SkinType.PLAYER) {
+            JsonObject jsonFile = getChacheFile(plugin);
+            JsonArray skindata = null;
+            try{
+                skindata = jsonFile.getAsJsonArray("skindata");
+            }catch(Exception ex){
 
-        }
-        JsonSkinData skin = null;
-        if(skindata!=null){
-            Iterator it = skindata.iterator();
-            while(it.hasNext()){
-                JsonElement element = (JsonElement) it.next();
-                if(element.getAsJsonObject().get("id").getAsInt()==this.npcid){
-                    String value = element.getAsJsonObject().get("value").getAsString();
-                    String signature = element.getAsJsonObject().get("signature").getAsString();
-                    long updated = element.getAsJsonObject().get("updated").getAsLong();
-                    SkinData data = new SkinData(value, signature);
-                    skin = new JsonSkinData(data, updated);
+            }
+            JsonSkinData skin = null;
+            if(skindata!=null){
+                Iterator it = skindata.iterator();
+                while(it.hasNext()){
+                    JsonElement element = (JsonElement) it.next();
+                    if(element.getAsJsonObject().get("id").getAsInt()==this.npcid){
+                        String value = element.getAsJsonObject().get("value").getAsString();
+                        String signature = element.getAsJsonObject().get("signature").getAsString();
+                        long updated = element.getAsJsonObject().get("updated").getAsLong();
+                        SkinData data = new SkinData(value, signature);
+                        skin = new JsonSkinData(data, updated);
+                    }
                 }
             }
+            return skin;
         }
-        return skin;
+        return null;
     }
 
     private void cacheSkin(SkinData skindata){
-        JsonObject jsonFile = getChacheFile(plugin);
-        JsonArray newskindata = new JsonArray();
-        if(jsonFile!=null){
-            JsonArray oldskindata = jsonFile.getAsJsonArray("skindata");
-            Iterator it = oldskindata.iterator();
-            while(it.hasNext()){
-                JsonElement element = (JsonElement) it.next();
-                if(element.getAsJsonObject().get("id").getAsInt()==this.npcid){
-                    // element.getAsJsonObject().remove("value");
-                    //element.getAsJsonObject().remove("signature");
-                    //element.getAsJsonObject().addProperty("value", skindata.getValue());
-                    //element.getAsJsonObject().addProperty("signature", skindata.getSignature());
-                }else {
-                    newskindata.add(element);
+        if(TruenoNPCApi.getCache() && this.skin.getSkinType()!=SkinType.PLAYER) {
+            JsonObject jsonFile = getChacheFile(plugin);
+            JsonArray newskindata = new JsonArray();
+            if (jsonFile != null) {
+                JsonArray oldskindata = jsonFile.getAsJsonArray("skindata");
+                Iterator it = oldskindata.iterator();
+                while (it.hasNext()) {
+                    JsonElement element = (JsonElement) it.next();
+                    if (element.getAsJsonObject().get("id").getAsInt() == this.npcid) {
+                    } else {
+                        newskindata.add(element);
+                    }
                 }
             }
-        }
-        JsonObject skin = new JsonObject();
-        Date actualdate = new Date();
-        skin.addProperty("id", this.npcid);
-        skin.addProperty("value", skindata.getValue());
-        skin.addProperty("signature", skindata.getSignature());
-        skin.addProperty("updated", actualdate.getTime());
-        newskindata.add(skin);
+            JsonObject skin = new JsonObject();
+            Date actualdate = new Date();
+            skin.addProperty("id", this.npcid);
+            skin.addProperty("value", skindata.getValue());
+            skin.addProperty("signature", skindata.getSignature());
+            skin.addProperty("updated", actualdate.getTime());
+            newskindata.add(skin);
 
-        JsonObject obj = new JsonObject();
-        obj.add("skindata", newskindata);
-        try {
-            plugin.getDataFolder().mkdir();
-            File file = new File(plugin.getDataFolder().getPath()+"/truenonpcdata.json");
-            file.createNewFile();
-            FileWriter writer = new FileWriter(file);
-            writer.write(obj.toString());
-            writer.close();
+            JsonObject obj = new JsonObject();
+            obj.add("skindata", newskindata);
+            try {
+                plugin.getDataFolder().mkdir();
+                File file = new File(plugin.getDataFolder().getPath() + "/truenonpcdata.json");
+                file.createNewFile();
+                FileWriter writer = new FileWriter(file);
+                writer.write(obj.toString());
+                writer.close();
 
-        } catch (Exception e) {
-            e.printStackTrace();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -247,7 +261,6 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
 
 
     public TruenoNPC_v1_11_r1(Location location, TruenoNPCSkin skin){
-        entityID = (int)Math.ceil(Math.random() * 1000) + 2000;
         npcid = id++;
         this.skin = skin;
         this.location = location;
@@ -277,43 +290,113 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
     private void spawn(Player p){
         Date actualdate = new Date();
         JsonSkinData cachedskin = getCachedSkin();
-        if(cachedskin==null || (((actualdate.getTime())-(getCachedSkin().getTimeUpdated())) >= 900000)){
-            this.skin.getSkinDataAsync(new SkinDataReply() {
-                @Override
-                public void done(SkinData skinData) {
-                    GameProfile profile = getGameProfile(getRandomString(8), skinData);
-                    if(skinData!=null){
-                        setGameProfile(profile);
-                        cacheSkin(skinData);
-                        spawnEnttity(p, skinData);
-                    }else{
-                        profile = getGameProfile(getRandomString(8), cachedskin.getSkinData());
-                        setGameProfile(profile);
-                        spawnEnttity(p, cachedskin.getSkinData());
+        if(cachedskin==null || (((actualdate.getTime())-(getCachedSkin().getTimeUpdated())) >= 518400)){
+            if(this.skin.getSkinType()== SkinType.PLAYER){
+                this.skin.getSkinDataAsync(new SkinDataReply() {
+                    @Override
+                    public void done(SkinData skinData) {
+                        GameProfile profile = getGameProfile(StringUtils.getRandomString(), skinData);
+                        if(skinData!=null){
+                            if(player_cache.containsKey(p)){
+                                player_cache.replace(p, skinData);
+                            }else{
+                                player_cache.put(p, skinData);
+                            }
+                            spawnEnttity(p, profile);
+                        }else{
+                            profile = getGameProfile(StringUtils.getRandomString(), null);
+                            if(player_cache.containsKey(p)){
+                                profile = getGameProfile(StringUtils.getRandomString(), player_cache.get(p));
+                            }
+                            spawnEnttity(p, profile);
+                        }
                     }
-                }
-            });
+                }, p);
+            }else{
+                this.skin.getSkinDataAsync(new SkinDataReply() {
+                    @Override
+                    public void done(SkinData skinData) {
+                        GameProfile profile = getGameProfile(StringUtils.getRandomString(), skinData);
+                        if(skinData!=null){
+                            setGameProfile(profile);
+                            cacheSkin(skinData);
+                            spawnEnttity(p);
+                        } else{
+                            profile = getGameProfile(StringUtils.getRandomString(), null);
+                            setGameProfile(profile);
+                            spawnEnttity(p);
+                        }
+                    }
+                });
+            }
         }else{
-            //SI LA SKIN CACHEADA ES VALIDA
-            GameProfile profile = getGameProfile(getRandomString(8), cachedskin.getSkinData());
+            GameProfile profile = getGameProfile(StringUtils.getRandomString(), cachedskin.getSkinData());
             setGameProfile(profile);
-            spawnEnttity(p, cachedskin.getSkinData());
+            spawnEnttity(p);
         }
     }
 
-    private void spawnEnttity(Player p, SkinData skindata){
-        GameProfile profile = this.gameprofile;
-
+    private void spawnEnttity(Player p){
         MinecraftServer nmsServer = ((CraftServer)Bukkit.getServer()).getServer();
         WorldServer nmsWorld = ((CraftWorld)getLocation().getWorld()).getHandle();
         EntityPlayer npcentity = new EntityPlayer(nmsServer, nmsWorld, this.gameprofile, new PlayerInteractManager(nmsWorld));
         npcentity.setLocation(location.getX(),location.getY(),location.getZ(),(byte)location.getYaw(),(byte)location.getPitch());
-        this.entityID = npcentity.getId();
-        this.npcentity = npcentity;
+        if(this.player_entity.containsKey(p)){
+            this.player_entity.replace(p, npcentity);
+        }else{
+            this.player_entity.put(p, npcentity);
+        }
         PacketPlayOutNamedEntitySpawn spawnpacket = new PacketPlayOutNamedEntitySpawn(npcentity);
         DataWatcher watcher = npcentity.getDataWatcher();
         watcher.set(new DataWatcherObject<>(13, DataWatcherRegistry.a), (byte) 0xFF);
+        setValue(spawnpacket, "h", watcher);
 
+        PacketPlayOutScoreboardTeam scbpacket = new PacketPlayOutScoreboardTeam();
+        try {
+            Collection<String> plys = Lists.newArrayList();
+            plys.add(gameprofile.getName());
+            setValue(scbpacket, "i",0);
+            setValue(scbpacket, "b",this.gameprofile.getName());
+            setValue(scbpacket, "a",this.gameprofile.getName());
+            setValue(scbpacket, "e","never");
+            setValue(scbpacket, "j",1);
+            setValue(scbpacket, "h", plys);
+            sendPacket(scbpacket, p);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        addToTablist(p, npcentity);
+        sendPacket(spawnpacket, p);
+
+        PacketPlayOutEntityHeadRotation rotationpacket = new PacketPlayOutEntityHeadRotation();
+        setValue(rotationpacket, "a", npcentity.getId());
+        setValue(rotationpacket, "b", (byte) ((int) (location.getYaw() * 256.0F / 360.0F)));
+        sendPacket(rotationpacket, p);
+        Bukkit.getScheduler().runTaskLater(TruenoNPC_v1_11_r1.plugin, new Runnable(){
+            @Override
+            public void run() {
+                rmvFromTablist(p, npcentity);
+            }
+        },26);
+        this.rendered.add(p);
+        this.waiting.remove(p);
+        TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(p, (TruenoNPC) this);
+        Bukkit.getPluginManager().callEvent(event);
+    }
+
+    private void spawnEnttity(Player p, GameProfile profile){
+        MinecraftServer nmsServer = ((CraftServer)Bukkit.getServer()).getServer();
+        WorldServer nmsWorld = ((CraftWorld)getLocation().getWorld()).getHandle();
+        EntityPlayer npcentity = new EntityPlayer(nmsServer, nmsWorld, profile, new PlayerInteractManager(nmsWorld));
+        npcentity.setLocation(location.getX(),location.getY(),location.getZ(),(byte)location.getYaw(),(byte)location.getPitch());
+        if(this.player_entity.containsKey(p)){
+            this.player_entity.replace(p, npcentity);
+        }else{
+            this.player_entity.put(p, npcentity);
+        }
+        PacketPlayOutNamedEntitySpawn spawnpacket = new PacketPlayOutNamedEntitySpawn(npcentity);
+        DataWatcher watcher = npcentity.getDataWatcher();
+        watcher.set(new DataWatcherObject<>(13, DataWatcherRegistry.a), (byte) 0xFF);
         setValue(spawnpacket, "h", watcher);
 
         PacketPlayOutScoreboardTeam scbpacket = new PacketPlayOutScoreboardTeam();
@@ -330,17 +413,17 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
-        addToTablist(p);
+        addToTablist(p, npcentity);
         sendPacket(spawnpacket, p);
 
         PacketPlayOutEntityHeadRotation rotationpacket = new PacketPlayOutEntityHeadRotation();
-        setValue(rotationpacket, "a", entityID);
+        setValue(rotationpacket, "a", npcentity.getId());
         setValue(rotationpacket, "b", (byte) ((int) (location.getYaw() * 256.0F / 360.0F)));
         sendPacket(rotationpacket, p);
         Bukkit.getScheduler().runTaskLater(TruenoNPC_v1_11_r1.plugin, new Runnable(){
             @Override
             public void run() {
-                rmvFromTablist(p);
+                rmvFromTablist(p, npcentity);
             }
         },26);
         this.rendered.add(p);
@@ -350,15 +433,21 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
     }
 
     private void destroy(Player p){
-        PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(new int[] {entityID});
-        rmvFromTablist(p);
-        sendPacket(packet, p);
+        EntityPlayer npcentity = null;
         try{
+            if(this.player_entity.get(p)!=null){
+                npcentity = this.player_entity.get(p);
+            }
+
             PacketPlayOutScoreboardTeam removescbpacket = new PacketPlayOutScoreboardTeam();
-            setValue(removescbpacket,"a", this.gameprofile.getName());
+            setValue(removescbpacket,"a", npcentity.getProfile().getName());
             setValue(removescbpacket,"i", 1);
             sendPacket(removescbpacket, p);
-            rendered.remove(p);
+
+            PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(new int[] {npcentity.getId()});
+            sendPacket(packet, p);
+
+            this.rendered.remove(p);
             TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(p, (TruenoNPC) this);
             Bukkit.getPluginManager().callEvent(event);
         }catch(Exception ex){
@@ -366,18 +455,13 @@ public class TruenoNPC_v1_11_r1 implements TruenoNPC {
         }
     }
 
-    private void destroy(){
-        for(Player pl : Bukkit.getOnlinePlayers()){
-            destroy(pl);
-        }
-    }
 
-    private void addToTablist(Player p){
+    private void addToTablist(Player p, EntityPlayer npcentity){
         PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER, npcentity);
         sendPacket(packet, p);
     }
 
-    private void rmvFromTablist(Player p){
+    private void rmvFromTablist(Player p, EntityPlayer npcentity){
         PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo(PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER, npcentity);
         sendPacket(packet, p);
     }

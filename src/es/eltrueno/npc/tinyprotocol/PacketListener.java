@@ -28,7 +28,7 @@ public class PacketListener {
                     if(EntityInteractClass.isInstance(packet)){
                         if(!playerswhointeract.contains(sender)){
                             for(TruenoNPC npc : TruenoNPCApi.getNPCs()){
-                                if(npc.getEntityID()==EntityID.get(packet)){
+                                if(npc.getEntityID(sender)==EntityID.get(packet)){
                                     TruenoNPCInteractEvent event = new TruenoNPCInteractEvent(sender, npc);
                                     Bukkit.getPluginManager().callEvent(event);
                                     break;

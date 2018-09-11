@@ -7,17 +7,19 @@ import com.google.gson.JsonParser;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import es.eltrueno.npc.TruenoNPC;
+import es.eltrueno.npc.TruenoNPCApi;
 import es.eltrueno.npc.event.TruenoNPCDespawnEvent;
 import es.eltrueno.npc.event.TruenoNPCSpawnEvent;
-import es.eltrueno.npc.skin.JsonSkinData;
-import es.eltrueno.npc.skin.SkinData;
-import es.eltrueno.npc.skin.SkinDataReply;
-import es.eltrueno.npc.skin.TruenoNPCSkin;
+import es.eltrueno.npc.skin.*;
+import es.eltrueno.npc.utils.StringUtils;
 import net.minecraft.server.v1_8_R3.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.craftbukkit.v1_8_R3.CraftWorld;
 import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.craftbukkit.v1_8_R3.util.CraftChatMessage;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -51,6 +53,8 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
     private TruenoNPCSkin skin;
     private List<Player> rendered = new ArrayList<Player>();
     private List<Player> waiting = new ArrayList<Player>();
+    private HashMap<Player, GameProfile> player_profile = new HashMap<Player, GameProfile>();
+    private HashMap<Player, SkinData> player_cache = new HashMap<Player, SkinData>();
 
     public static void startTask(Plugin plugin){
         if(!taskstarted){
@@ -77,6 +81,17 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
                     }
                 }
             },0,30);
+
+            Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, new Runnable() {
+                @Override
+                public void run() {
+                    for(TruenoNPC_v1_8_r3 nmsnpc : npcs) {
+                        for (Player pl : Bukkit.getOnlinePlayers()) {
+                            nmsnpc.destroy(pl);
+                        }
+                    }
+                }
+            },20*(60*5),20*(60*5));
         }
     }
 
@@ -108,7 +123,7 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
     }
 
     @Override
-    public int getEntityID(){
+    public int getEntityID(Player p){
         return this.entityID;
     }
 
@@ -122,20 +137,6 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
         return npcid;
     }
 
-    private String getRandomString (int lenght){
-        String randStr = "";
-        long milis = new GregorianCalendar().getTimeInMillis();
-        Random r = new Random(milis);
-        int i = 0;
-        while ( i < lenght){
-            char c = (char)r.nextInt(255);
-            if ( (c >= '0' && c <='9') || (c >='A' && c <='Z') ){
-                randStr += c;
-                i ++;
-            }
-        }
-        return randStr;
-    }
 
     private JsonObject getChacheFile(Plugin plugin){
         File file = new File(plugin.getDataFolder().getPath()+"/truenonpcdata.json");
@@ -159,68 +160,69 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
     }
 
     private JsonSkinData getCachedSkin(){
-        JsonObject jsonFile = getChacheFile(plugin);
-        JsonArray skindata = null;
-        try{
-            skindata = jsonFile.getAsJsonArray("skindata");
-        }catch(Exception ex){
+        if(TruenoNPCApi.getCache() && this.skin.getSkinType()!= SkinType.PLAYER) {
+            JsonObject jsonFile = getChacheFile(plugin);
+            JsonArray skindata = null;
+            try{
+                skindata = jsonFile.getAsJsonArray("skindata");
+            }catch(Exception ex){
 
-        }
-        JsonSkinData skin = null;
-        if(skindata!=null){
-            Iterator it = skindata.iterator();
-            while(it.hasNext()){
-                JsonElement element = (JsonElement) it.next();
-                if(element.getAsJsonObject().get("id").getAsInt()==this.npcid){
-                    String value = element.getAsJsonObject().get("value").getAsString();
-                    String signature = element.getAsJsonObject().get("signature").getAsString();
-                    long updated = element.getAsJsonObject().get("updated").getAsLong();
-                    SkinData data = new SkinData(value, signature);
-                    skin = new JsonSkinData(data, updated);
+            }
+            JsonSkinData skin = null;
+            if(skindata!=null){
+                Iterator it = skindata.iterator();
+                while(it.hasNext()){
+                    JsonElement element = (JsonElement) it.next();
+                    if(element.getAsJsonObject().get("id").getAsInt()==this.npcid){
+                        String value = element.getAsJsonObject().get("value").getAsString();
+                        String signature = element.getAsJsonObject().get("signature").getAsString();
+                        long updated = element.getAsJsonObject().get("updated").getAsLong();
+                        SkinData data = new SkinData(value, signature);
+                        skin = new JsonSkinData(data, updated);
+                    }
                 }
             }
+            return skin;
         }
-        return skin;
+        return null;
     }
 
     private void cacheSkin(SkinData skindata){
-        JsonObject jsonFile = getChacheFile(plugin);
-        JsonArray newskindata = new JsonArray();
-        if(jsonFile!=null){
-            JsonArray oldskindata = jsonFile.getAsJsonArray("skindata");
-            Iterator it = oldskindata.iterator();
-            while(it.hasNext()){
-                JsonElement element = (JsonElement) it.next();
-                if(element.getAsJsonObject().get("id").getAsInt()==this.npcid){
-                    // element.getAsJsonObject().remove("value");
-                    //element.getAsJsonObject().remove("signature");
-                    //element.getAsJsonObject().addProperty("value", skindata.getValue());
-                    //element.getAsJsonObject().addProperty("signature", skindata.getSignature());
-                }else {
-                    newskindata.add(element);
+        if(TruenoNPCApi.getCache() && this.skin.getSkinType()!=SkinType.PLAYER) {
+            JsonObject jsonFile = getChacheFile(plugin);
+            JsonArray newskindata = new JsonArray();
+            if (jsonFile != null) {
+                JsonArray oldskindata = jsonFile.getAsJsonArray("skindata");
+                Iterator it = oldskindata.iterator();
+                while (it.hasNext()) {
+                    JsonElement element = (JsonElement) it.next();
+                    if (element.getAsJsonObject().get("id").getAsInt() == this.npcid) {
+                    } else {
+                        newskindata.add(element);
+                    }
                 }
             }
-        }
-        JsonObject skin = new JsonObject();
-        Date actualdate = new Date();
-        skin.addProperty("id", this.npcid);
-        skin.addProperty("value", skindata.getValue());
-        skin.addProperty("signature", skindata.getSignature());
-        skin.addProperty("updated", actualdate.getTime());
-        newskindata.add(skin);
+            JsonObject skin = new JsonObject();
+            Date actualdate = new Date();
+            skin.addProperty("id", this.npcid);
+            skin.addProperty("value", skindata.getValue());
+            skin.addProperty("signature", skindata.getSignature());
+            skin.addProperty("updated", actualdate.getTime());
+            newskindata.add(skin);
 
-        JsonObject obj = new JsonObject();
-        obj.add("skindata", newskindata);
-        try {
-            plugin.getDataFolder().mkdir();
-            File file = new File(plugin.getDataFolder().getPath()+"/truenonpcdata.json");
-            file.createNewFile();
-            FileWriter writer = new FileWriter(file);
-            writer.write(obj.toString());
-            writer.close();
+            JsonObject obj = new JsonObject();
+            obj.add("skindata", newskindata);
+            try {
+                plugin.getDataFolder().mkdir();
+                File file = new File(plugin.getDataFolder().getPath() + "/truenonpcdata.json");
+                file.createNewFile();
+                FileWriter writer = new FileWriter(file);
+                writer.write(obj.toString());
+                writer.close();
 
-        } catch (Exception e) {
-            e.printStackTrace();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -280,31 +282,63 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
     private void spawn(Player p){
         Date actualdate = new Date();
         JsonSkinData cachedskin = getCachedSkin();
-        if(cachedskin==null || (((actualdate.getTime())-(getCachedSkin().getTimeUpdated())) >= 900000)){
-            this.skin.getSkinDataAsync(new SkinDataReply() {
-                @Override
-                public void done(SkinData skinData) {
-                    GameProfile profile = getGameProfile(getRandomString(8), skinData);
-                    if(skinData!=null){
-                        setGameProfile(profile);
-                        cacheSkin(skinData);
-                        spawnEnttity(p, skinData);
-                    }else{
-                        profile = getGameProfile(getRandomString(8), cachedskin.getSkinData());
-                        setGameProfile(profile);
-                        spawnEnttity(p, cachedskin.getSkinData());
+        if(cachedskin==null || (((actualdate.getTime())-(getCachedSkin().getTimeUpdated())) >= 518400)){
+            if(this.skin.getSkinType()== SkinType.PLAYER){
+                this.skin.getSkinDataAsync(new SkinDataReply() {
+                    @Override
+                    public void done(SkinData skinData) {
+                        GameProfile profile = getGameProfile(StringUtils.getRandomString(), skinData);
+                        if(skinData!=null){
+                            if(player_profile.containsKey(p)){
+                                player_profile.replace(p, profile);
+                            }else{
+                                player_profile.put(p, profile);
+                            }
+                            if(player_cache.containsKey(p)){
+                                player_cache.replace(p, skinData);
+                            }else{
+                                player_cache.put(p, skinData);
+                            }
+                            spawnEnttity(p, profile);
+                        }else{
+                            profile = getGameProfile(StringUtils.getRandomString(), null);
+                            if(player_cache.containsKey(p)){
+                                profile = getGameProfile(StringUtils.getRandomString(), player_cache.get(p));
+                            }
+                            if(player_profile.containsKey(p)){
+                                player_profile.replace(p, profile);
+                            }else{
+                                player_profile.put(p, profile);
+                            }
+                            spawnEnttity(p, profile);
+                        }
                     }
-                }
-            });
+                }, p);
+            }else{
+                this.skin.getSkinDataAsync(new SkinDataReply() {
+                    @Override
+                    public void done(SkinData skinData) {
+                        GameProfile profile = getGameProfile(StringUtils.getRandomString(), skinData);
+                        if(skinData!=null){
+                            setGameProfile(profile);
+                            cacheSkin(skinData);
+                            spawnEnttity(p);
+                        } else{
+                            profile = getGameProfile(StringUtils.getRandomString(), null);
+                            setGameProfile(profile);
+                            spawnEnttity(p);
+                        }
+                    }
+                });
+            }
         }else{
-            //SI LA SKIN CACHEADA ES VALIDA
-            GameProfile profile = getGameProfile(getRandomString(8), cachedskin.getSkinData());
+            GameProfile profile = getGameProfile(StringUtils.getRandomString(), cachedskin.getSkinData());
             setGameProfile(profile);
-            spawnEnttity(p, cachedskin.getSkinData());
+            spawnEnttity(p);
         }
     }
 
-    private void spawnEnttity(Player p, SkinData skindata){
+    private void spawnEnttity(Player p){
         GameProfile profile = this.gameprofile;
         PacketPlayOutNamedEntitySpawn packet = new PacketPlayOutNamedEntitySpawn();
 
@@ -350,21 +384,77 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
         Bukkit.getPluginManager().callEvent(event);
     }
 
-    private void destroy(Player p){
-        PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(new int[] {entityID});
-        rmvFromTablist(p);
+    private void spawnEnttity(Player p, GameProfile profile){
+        PacketPlayOutNamedEntitySpawn packet = new PacketPlayOutNamedEntitySpawn();
+
+        setValue(packet, "a", entityID);
+        setValue(packet, "b", profile.getId());
+        setValue(packet, "c", (int) MathHelper.floor(location.getX() * 32.0D));
+        setValue(packet, "d", (int)MathHelper.floor(location.getY() * 32.0D));
+        setValue(packet, "e", (int)MathHelper.floor(location.getZ() * 32.0D));
+        setValue(packet, "f", (byte) ((int) (location.getYaw() * 256.0F / 360.0F)));
+        setValue(packet, "g", (byte) ((int) (location.getPitch() * 256.0F / 360.0F)));
+        DataWatcher w = new DataWatcher(null);
+        w.a(10,(byte)127);
+        setValue(packet, "i", w);
+        try {
+            scbpacket = new PacketPlayOutScoreboardTeam();
+            setValue(scbpacket, "h",0);
+            setValue(scbpacket, "b",profile.getName());
+            setValue(scbpacket, "a",profile.getName());
+            setValue(scbpacket, "e","never");
+            setValue(scbpacket, "i",1);
+            Field f = scbpacket.getClass().getDeclaredField("g");
+            f.setAccessible(true);
+            ((Collection) f.get(scbpacket)).add(profile.getName());
+            sendPacket(scbpacket, p);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        addToTablist(p, profile);
         sendPacket(packet, p);
+        PacketPlayOutEntityHeadRotation rotationpacket = new PacketPlayOutEntityHeadRotation();
+        setValue(rotationpacket, "a", entityID);
+        setValue(rotationpacket, "b", (byte) ((int) (location.getYaw() * 256.0F / 360.0F)));
+        sendPacket(rotationpacket, p);
+        Bukkit.getScheduler().runTaskLater(TruenoNPC_v1_8_r3.plugin, new Runnable(){
+            @Override
+            public void run() {
+                rmvFromTablist(p, player_profile.get(p));
+            }
+        },26);
+        this.rendered.add(p);
+        this.waiting.remove(p);
+        TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(p, (TruenoNPC) this);
+        Bukkit.getPluginManager().callEvent(event);
+    }
+
+    private void destroy(Player p){
+        GameProfile profile = this.gameprofile;
         try{
+            if(this.skin.getSkinType()==SkinType.PLAYER){
+                if(this.player_profile.get(p)!=null){
+                    profile = this.player_profile.get(p);
+                    rmvFromTablist(p, profile);
+                }
+            }else {
+                rmvFromTablist(p);
+            }
+
             PacketPlayOutScoreboardTeam removescbpacket = new PacketPlayOutScoreboardTeam();
             Field f = removescbpacket.getClass().getDeclaredField("a");
             f.setAccessible(true);
-            f.set(removescbpacket, this.gameprofile.getName());
+            f.set(removescbpacket, profile.getName());
             f.setAccessible(false);
             Field f2 = removescbpacket.getClass().getDeclaredField("h");
             f2.setAccessible(true);
             f2.set(removescbpacket, 1);
             f2.setAccessible(false);
             ((CraftPlayer) p).getHandle().playerConnection.sendPacket(removescbpacket);
+
+            PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(new int[] {entityID});
+            sendPacket(packet, p);
+
             this.rendered.remove(p);
             TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(p, (TruenoNPC) this);
             Bukkit.getPluginManager().callEvent(event);
@@ -372,6 +462,7 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
             ex.printStackTrace();
         }
     }
+
 
     private void addToTablist(Player p){
         PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo();
@@ -386,9 +477,35 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
         sendPacket(packet, p);
     }
 
+    private void addToTablist(Player p, GameProfile profile){
+        PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo();
+        PacketPlayOutPlayerInfo.PlayerInfoData data = packet.new PlayerInfoData(profile, 1, WorldSettings.EnumGamemode.NOT_SET, CraftChatMessage.fromString("§8[NPC] "+profile.getName())[0]);
+        @SuppressWarnings("unchecked")
+        List<PacketPlayOutPlayerInfo.PlayerInfoData> players = (List<PacketPlayOutPlayerInfo.PlayerInfoData>) getValue(packet, "b");
+        players.add(data);
+
+        setValue(packet, "a", PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER);
+        setValue(packet, "b", players);
+
+        sendPacket(packet, p);
+    }
+
     private void rmvFromTablist(Player p){
         PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo();
         PacketPlayOutPlayerInfo.PlayerInfoData data = packet.new PlayerInfoData(gameprofile, 1, WorldSettings.EnumGamemode.NOT_SET, CraftChatMessage.fromString("§8[NPC] "+gameprofile.getName())[0]);
+        @SuppressWarnings("unchecked")
+        List<PacketPlayOutPlayerInfo.PlayerInfoData> players = (List<PacketPlayOutPlayerInfo.PlayerInfoData>) getValue(packet, "b");
+        players.add(data);
+
+        setValue(packet, "a", PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER);
+        setValue(packet, "b", players);
+
+        sendPacket(packet, p);
+    }
+
+    private void rmvFromTablist(Player p, GameProfile profile){
+        PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo();
+        PacketPlayOutPlayerInfo.PlayerInfoData data = packet.new PlayerInfoData(profile, 1, WorldSettings.EnumGamemode.NOT_SET, CraftChatMessage.fromString("§8[NPC] "+profile.getName())[0]);
         @SuppressWarnings("unchecked")
         List<PacketPlayOutPlayerInfo.PlayerInfoData> players = (List<PacketPlayOutPlayerInfo.PlayerInfoData>) getValue(packet, "b");
         players.add(data);
