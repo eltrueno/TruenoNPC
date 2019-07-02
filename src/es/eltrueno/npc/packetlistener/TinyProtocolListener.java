@@ -1,8 +1,10 @@
-package es.eltrueno.npc.tinyprotocol;
+package es.eltrueno.npc.packetlistener;
 
 import es.eltrueno.npc.TruenoNPC;
 import es.eltrueno.npc.TruenoNPCApi;
 import es.eltrueno.npc.event.TruenoNPCInteractEvent;
+import es.eltrueno.npc.tinyprotocol.Reflection;
+import es.eltrueno.npc.tinyprotocol.TinyProtocol;
 import io.netty.channel.Channel;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -10,7 +12,7 @@ import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
 
-public class PacketListener {
+public class TinyProtocolListener implements PacketListener{
 
     private static TinyProtocol protocol = null;
 
@@ -19,8 +21,8 @@ public class PacketListener {
     private static ArrayList<Player> playerswhointeract = new ArrayList<Player>();
 
 
-
-    public static void startListening(Plugin plugin){
+    @Override
+    public void startListening(Plugin plugin){
         if(protocol==null) {
             protocol = new TinyProtocol(plugin) {
                 @Override

@@ -1,5 +1,10 @@
-package es.eltrueno.npc.nms;
+package es.eltrueno.npc.protocollib;
 
+import com.comphenix.protocol.PacketType;
+import com.comphenix.protocol.ProtocolLibrary;
+import com.comphenix.protocol.events.PacketContainer;
+import com.comphenix.protocol.reflect.StructureModifier;
+import com.comphenix.protocol.wrappers.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -10,13 +15,14 @@ import es.eltrueno.npc.TruenoNPC;
 import es.eltrueno.npc.TruenoNPCApi;
 import es.eltrueno.npc.event.TruenoNPCDespawnEvent;
 import es.eltrueno.npc.event.TruenoNPCSpawnEvent;
+import es.eltrueno.npc.protocollib.utils.MathHelper;
+import es.eltrueno.npc.protocollib.wrapper.WrapperPlayServerEntityDestroy;
+import es.eltrueno.npc.protocollib.wrapper.WrapperPlayServerPlayerInfo;
+import es.eltrueno.npc.protocollib.wrapper.WrapperPlayServerScoreboardTeam;
 import es.eltrueno.npc.skin.*;
 import es.eltrueno.npc.utils.StringUtils;
-import net.minecraft.server.v1_8_R3.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
-import org.bukkit.craftbukkit.v1_8_R3.util.CraftChatMessage;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -25,9 +31,10 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
-public class TruenoNPC_v1_8_r3 implements TruenoNPC {
+public class TruenoNPC_ProtocolLib implements TruenoNPC {
 
     /**
      *
@@ -37,40 +44,31 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
      *
      **/
 
-    private static int count = 9000;
-    private static int generateID() {
-        if(count==9999){
-            count = 9000;
-        }else count++;
-        return count;
-    }
-
-    private static List<TruenoNPC_v1_8_r3> npcs = new ArrayList<TruenoNPC_v1_8_r3>();
+    private static List<TruenoNPC_ProtocolLib> npcs = new ArrayList<TruenoNPC_ProtocolLib>();
     private static int id = 0;
     private static boolean taskstarted = false;
     private static Plugin plugin;
-    private PacketPlayOutScoreboardTeam scbpacket;
     private boolean deleted = false;
     private int npcid;
     private int entityID;
     private Location location;
+    private String name;
     private GameProfile gameprofile;
     private TruenoNPCSkin skin;
     private List<Player> rendered = new ArrayList<Player>();
     private List<Player> waiting = new ArrayList<Player>();
     private HashMap<Player, GameProfile> player_profile = new HashMap<Player, GameProfile>();
     private HashMap<Player, SkinData> player_cache = new HashMap<Player, SkinData>();
-    private List<Player> sended_teams = new ArrayList<Player>();
-    private String name;
+    private List<Player> teams_created = new ArrayList<Player>();
 
     public static void startTask(Plugin plugin){
         if(!taskstarted){
             taskstarted = true;
-            TruenoNPC_v1_8_r3.plugin = plugin;
+            TruenoNPC_ProtocolLib.plugin = plugin;
             Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, new Runnable() {
                 @Override
                 public void run() {
-                    for(TruenoNPC_v1_8_r3 nmsnpc : npcs){
+                    for(TruenoNPC_ProtocolLib nmsnpc : npcs){
                         for(Player pl : Bukkit.getOnlinePlayers()){
                             if(nmsnpc.location.getWorld().equals(pl.getWorld())){
                                 if(nmsnpc.location.distance(pl.getLocation())>60 && nmsnpc.rendered.contains(pl)){
@@ -80,17 +78,11 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
                                         nmsnpc.waiting.add(pl);
                                         nmsnpc.spawn(pl);
                                     }
-                                }else if(nmsnpc.rendered.contains(pl)){
-                                    if(nmsnpc.getSkin().getSkinType()==SkinType.PLAYER) {
-                                        if(nmsnpc.player_profile.containsKey(pl)){
-                                            nmsnpc.rmvFromTablist(pl, nmsnpc.player_profile.get(pl));
-                                        }
-                                    }else{
-                                        nmsnpc.rmvFromTablist(pl);
-                                    }
                                 }
                             }else{
-                                nmsnpc.destroy(pl);
+                                //final TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(pl, nmsnpc);
+                                //Bukkit.getPluginManager().callEvent(event);
+                                //nmsnpc.rendered.remove(pl);
                             }
                         }
                     }
@@ -100,13 +92,13 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
             Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, new Runnable() {
                 @Override
                 public void run() {
-                    //Bukkit.broadcastMessage("npc task ini");
-                    for(TruenoNPC_v1_8_r3 nmsnpc : npcs) {
+                    for(TruenoNPC_ProtocolLib nmsnpc : npcs) {
                         for (Player pl : Bukkit.getOnlinePlayers()) {
-                            nmsnpc.destroy(pl);
+                            if(nmsnpc.rendered.contains(pl)) {
+                                nmsnpc.destroy(pl);
+                            }
                         }
                     }
-                    //Bukkit.broadcastMessage("npc task out");
                 }
             },20*(60*5),20*(60*5));
         }
@@ -129,15 +121,13 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
         return null;
     }
 
-    private void sendPacket(Packet<?> packet, Player player){
-        ((CraftPlayer)player).getHandle().playerConnection.sendPacket(packet);
-    }
 
 
     @Override
     public Location getLocation(){
         return this.location;
     }
+
 
     @Override
     public int getEntityID(Player p){
@@ -268,9 +258,8 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
         }
     }
 
-    public TruenoNPC_v1_8_r3(Location location, TruenoNPCSkin skin){
-        //entityID = (int)Math.ceil(Math.random() * 1000) + 2000;
-        entityID = generateID();
+    public TruenoNPC_ProtocolLib(Location location, TruenoNPCSkin skin){
+        entityID = (int)Math.ceil(Math.random() * 1000) + 2000;
         npcid = id++;
         this.skin = skin;
         this.name = StringUtils.getRandomString();
@@ -333,11 +322,11 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
                         if(skinData!=null){
                             setGameProfile(profile);
                             cacheSkin(skinData);
-                            spawnEnttity(p);
+                            spawnEnttity(p, gameprofile);
                         } else{
                             profile = getGameProfile(name, null);
                             setGameProfile(profile);
-                            spawnEnttity(p);
+                            spawnEnttity(p, gameprofile);
                         }
                     }
                 });
@@ -345,107 +334,62 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
         }else{
             GameProfile profile = getGameProfile(name, cachedskin.getSkinData());
             setGameProfile(profile);
-            spawnEnttity(p);
+            spawnEnttity(p, gameprofile);
         }
-    }
-
-    private void spawnEnttity(Player p){
-        GameProfile profile = this.gameprofile;
-        PacketPlayOutNamedEntitySpawn packet = new PacketPlayOutNamedEntitySpawn();
-
-        setValue(packet, "a", entityID);
-        setValue(packet, "b", profile.getId());
-        setValue(packet, "c", (int) MathHelper.floor(location.getX() * 32.0D));
-        setValue(packet, "d", (int)MathHelper.floor(location.getY() * 32.0D));
-        setValue(packet, "e", (int)MathHelper.floor(location.getZ() * 32.0D));
-        setValue(packet, "f", (byte) ((int) (location.getYaw() * 256.0F / 360.0F)));
-        setValue(packet, "g", (byte) ((int) (location.getPitch() * 256.0F / 360.0F)));
-        DataWatcher w = new DataWatcher(null);
-        w.a(10,(byte)127);
-        setValue(packet, "i", w);
-        try {
-            if(!this.sended_teams.contains(p)) {
-                scbpacket = new PacketPlayOutScoreboardTeam();
-                setValue(scbpacket, "h", 0);
-                setValue(scbpacket, "b", profile.getName());
-                setValue(scbpacket, "a", profile.getName());
-                setValue(scbpacket, "e", "never");
-                setValue(scbpacket, "i", 1);
-                Field f = scbpacket.getClass().getDeclaredField("g");
-                f.setAccessible(true);
-                ((Collection) f.get(scbpacket)).add(profile.getName());
-                sendPacket(scbpacket, p);
-
-                sended_teams.add(p);
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-        addToTablist(p);
-        sendPacket(packet, p);
-        PacketPlayOutEntityHeadRotation rotationpacket = new PacketPlayOutEntityHeadRotation();
-        setValue(rotationpacket, "a", entityID);
-        setValue(rotationpacket, "b", (byte) ((int) (location.getYaw() * 256.0F / 360.0F)));
-        sendPacket(rotationpacket, p);
-        Bukkit.getScheduler().runTaskLater(TruenoNPC_v1_8_r3.plugin, new Runnable(){
-            @Override
-            public void run() {
-                rmvFromTablist(p);
-            }
-        },35);
-        this.rendered.add(p);
-        this.waiting.remove(p);
-        TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(p, (TruenoNPC) this);
-        Bukkit.getPluginManager().callEvent(event);
     }
 
     private void spawnEnttity(Player p, GameProfile profile){
-        PacketPlayOutNamedEntitySpawn packet = new PacketPlayOutNamedEntitySpawn();
+        final PacketContainer packet = new PacketContainer(PacketType.Play.Server.NAMED_ENTITY_SPAWN);
+        StructureModifier<Object> spawnPacketModifier = packet.getModifier();
 
-        setValue(packet, "a", entityID);
-        setValue(packet, "b", profile.getId());
-        setValue(packet, "c", (int) MathHelper.floor(location.getX() * 32.0D));
-        setValue(packet, "d", (int)MathHelper.floor(location.getY() * 32.0D));
-        setValue(packet, "e", (int)MathHelper.floor(location.getZ() * 32.0D));
-        setValue(packet, "f", (byte) ((int) (location.getYaw() * 256.0F / 360.0F)));
-        setValue(packet, "g", (byte) ((int) (location.getPitch() * 256.0F / 360.0F)));
-        DataWatcher w = new DataWatcher(null);
-        w.a(10,(byte)127);
-        setValue(packet, "i", w);
+        spawnPacketModifier.write(0, this.entityID);
+        spawnPacketModifier.write(1, profile.getId());
+        spawnPacketModifier.write(2, MathHelper.floor(this.location.getX() * 32.0));
+        spawnPacketModifier.write(3, MathHelper.floor(this.location.getY() * 32.0));
+        spawnPacketModifier.write(4, MathHelper.floor(this.location.getZ() * 32.0));
+        spawnPacketModifier.write(5, (byte) (this.location.getYaw() * 256.0f / 360.0f));
+        spawnPacketModifier.write(6, (byte) (this.location.getPitch() * 256.0f / 360.0f));
+
+        WrappedDataWatcher w = new WrappedDataWatcher();
+        w.setObject(10, (Object) (byte) 127);
+        packet.getDataWatcherModifier().write(0, w);
         try {
-            if(!this.sended_teams.contains(p)) {
-                scbpacket = new PacketPlayOutScoreboardTeam();
-                setValue(scbpacket, "h", 0);
-                setValue(scbpacket, "b", profile.getName());
-                setValue(scbpacket, "a", profile.getName());
-                setValue(scbpacket, "e", "never");
-                setValue(scbpacket, "i", 1);
-                Field f = scbpacket.getClass().getDeclaredField("g");
-                f.setAccessible(true);
-                ((Collection) f.get(scbpacket)).add(profile.getName());
-                sendPacket(scbpacket, p);
+            addToTablist(p, profile);
 
-                sended_teams.add(p);
+            ProtocolLibrary.getProtocolManager().sendServerPacket(p, packet, false);
+            if(!teams_created.contains(p)){
+                PacketContainer scbpacket = new PacketContainer(PacketType.Play.Server.SCOREBOARD_TEAM);
+                WrapperPlayServerScoreboardTeam scoreMods = new WrapperPlayServerScoreboardTeam(scbpacket);
+                scoreMods.setMode(WrapperPlayServerScoreboardTeam.Mode.TEAM_CREATED);
+                scoreMods.setName(profile.getName());
+                scoreMods.setDisplayName(profile.getName());
+                //scoreMods.setPrefix(profile.getName());
+                //scoreMods.setSuffix(profile.getName());
+                scoreMods.setNameTagVisibility("never");
+                List<String> list = new ArrayList<>();
+                list.add(profile.getName());
+                scoreMods.setPlayers(list);
+                ProtocolLibrary.getProtocolManager().sendServerPacket(p, scbpacket, false);
+                teams_created.add(p);
             }
+            final PacketContainer rotationpacket = new PacketContainer(PacketType.Play.Server.ENTITY_HEAD_ROTATION);
+            StructureModifier<Object> rotationModifier = rotationpacket.getModifier();
+            rotationModifier.write(0, this.entityID);
+            rotationModifier.write(1, (byte) (this.location.getYaw() * 256.0f / 360.0f));
+            ProtocolLibrary.getProtocolManager().sendServerPacket(p, rotationpacket, false);
+            Bukkit.getScheduler().runTaskLater(TruenoNPC_ProtocolLib.plugin, new Runnable() {
+                @Override
+                public void run() {
+                    TruenoNPC_ProtocolLib.this.rmvFromTablist(p, profile);
+                }
+            }, 26L);
+            this.rendered.add(p);
+            this.waiting.remove(p);
+            final TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(p, this);
+            Bukkit.getPluginManager().callEvent(event);
         } catch (Exception ex) {
             ex.printStackTrace();
         }
-        addToTablist(p, profile);
-        sendPacket(packet, p);
-        PacketPlayOutEntityHeadRotation rotationpacket = new PacketPlayOutEntityHeadRotation();
-        setValue(rotationpacket, "a", entityID);
-        setValue(rotationpacket, "b", (byte) ((int) (location.getYaw() * 256.0F / 360.0F)));
-        sendPacket(rotationpacket, p);
-        Bukkit.getScheduler().runTaskLater(TruenoNPC_v1_8_r3.plugin, new Runnable(){
-            @Override
-            public void run() {
-                rmvFromTablist(p, player_profile.get(p));
-            }
-        },26);
-        this.rendered.add(p);
-        this.waiting.remove(p);
-        TruenoNPCSpawnEvent event = new TruenoNPCSpawnEvent(p, (TruenoNPC) this);
-        Bukkit.getPluginManager().callEvent(event);
     }
 
     private void destroy(Player p){
@@ -454,13 +398,13 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
             if(this.skin.getSkinType()==SkinType.PLAYER){
                 if(this.player_profile.get(p)!=null){
                     profile = this.player_profile.get(p);
-                    rmvFromTablist(p, profile);
+                    //rmvFromTablist(p, profile);
                 }
             }else {
-                rmvFromTablist(p);
+                //rmvFromTablist(p);
             }
 
-            /*PacketPlayOutScoreboardTeam removescbpacket = new PacketPlayOutScoreboardTeam();
+           /* PacketPlayOutScoreboardTeam removescbpacket = new PacketPlayOutScoreboardTeam();
             Field f = removescbpacket.getClass().getDeclaredField("a");
             f.setAccessible(true);
             f.set(removescbpacket, profile.getName());
@@ -471,8 +415,8 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
             f2.setAccessible(false);
             ((CraftPlayer) p).getHandle().playerConnection.sendPacket(removescbpacket);*/
 
-            PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(new int[] {entityID});
-            sendPacket(packet, p);
+            //PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(new int[] {entityID});
+            destroyEntity(p);
 
             this.rendered.remove(p);
             TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(p, (TruenoNPC) this);
@@ -483,82 +427,100 @@ public class TruenoNPC_v1_8_r3 implements TruenoNPC {
     }
 
     private void destroyEntity(Player p){
-        try{
-            //rmvFromTablist(p);
-
-            PacketPlayOutScoreboardTeam removescbpacket = new PacketPlayOutScoreboardTeam();
-            Field f = removescbpacket.getClass().getDeclaredField("a");
-            f.setAccessible(true);
-            f.set(removescbpacket, this.gameprofile.getName());
-            f.setAccessible(false);
-            Field f2 = removescbpacket.getClass().getDeclaredField("h");
-            f2.setAccessible(true);
-            f2.set(removescbpacket, 1);
-            f2.setAccessible(false);
-            ((CraftPlayer) p).getHandle().playerConnection.sendPacket(removescbpacket);
-
-            PacketPlayOutEntityDestroy packet = new PacketPlayOutEntityDestroy(new int[] {entityID});
-            sendPacket(packet, p);
-
-            this.rendered.remove(p);
-            TruenoNPCDespawnEvent event = new TruenoNPCDespawnEvent(p, (TruenoNPC) this);
-            Bukkit.getPluginManager().callEvent(event);
-        }catch(Exception ex){
-            ex.printStackTrace();
+        PacketContainer packet = new PacketContainer(PacketType.Play.Server.ENTITY_DESTROY);
+        WrapperPlayServerEntityDestroy packetEditor = new WrapperPlayServerEntityDestroy(packet);
+        packetEditor.setEntityIds(new int[]{this.entityID});
+        try {
+            /*WrapperPlayServerScoreboardTeam scoreMods = new WrapperPlayServerScoreboardTeam(this.scbpacket);
+            scoreMods.setMode(WrapperPlayServerScoreboardTeam.Mode.TEAM_REMOVED);
+            ProtocolLibrary.getProtocolManager().sendServerPacket(p, scoreMods.getHandle(), false);*/
+            ProtocolLibrary.getProtocolManager().sendServerPacket(p, packet, false);
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
         }
     }
 
 
     private void addToTablist(Player p){
-        PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo();
-        PacketPlayOutPlayerInfo.PlayerInfoData data = packet.new PlayerInfoData(gameprofile, 1, WorldSettings.EnumGamemode.NOT_SET, CraftChatMessage.fromString("§8"+gameprofile.getName())[0]);
-        @SuppressWarnings("unchecked")
-        List<PacketPlayOutPlayerInfo.PlayerInfoData> players = (List<PacketPlayOutPlayerInfo.PlayerInfoData>) getValue(packet, "b");
-        players.add(data);
+        final PacketContainer packet = new PacketContainer(PacketType.Play.Server.PLAYER_INFO);
+        WrapperPlayServerPlayerInfo packet_editor = new WrapperPlayServerPlayerInfo(packet);
 
-        setValue(packet, "a", PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER);
-        setValue(packet, "b", players);
+        WrappedGameProfile profile = WrappedGameProfile.fromHandle(gameprofile);
 
-        sendPacket(packet, p);
+        PlayerInfoData newData = new PlayerInfoData(profile, 1, EnumWrappers.NativeGameMode.NOT_SET, WrappedChatComponent.fromText("§8[NPC] " + gameprofile.getName()));
+
+        List<PlayerInfoData> players = (List<PlayerInfoData>) packet.getPlayerInfoDataLists().read(0);
+        players.add(newData);
+
+        packet_editor.setAction(EnumWrappers.PlayerInfoAction.ADD_PLAYER);
+        packet_editor.setData(players);
+
+        try {
+            ProtocolLibrary.getProtocolManager().sendServerPacket(p, packet, false);
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
     }
 
-    private void addToTablist(Player p, GameProfile profile){
-        PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo();
-        PacketPlayOutPlayerInfo.PlayerInfoData data = packet.new PlayerInfoData(profile, 1, WorldSettings.EnumGamemode.NOT_SET, CraftChatMessage.fromString("§8"+profile.getName())[0]);
-        @SuppressWarnings("unchecked")
-        List<PacketPlayOutPlayerInfo.PlayerInfoData> players = (List<PacketPlayOutPlayerInfo.PlayerInfoData>) getValue(packet, "b");
-        players.add(data);
+    private void addToTablist(Player p, GameProfile gprofile){
+        final PacketContainer packet = new PacketContainer(PacketType.Play.Server.PLAYER_INFO);
+        WrapperPlayServerPlayerInfo packet_editor = new WrapperPlayServerPlayerInfo(packet);
 
-        setValue(packet, "a", PacketPlayOutPlayerInfo.EnumPlayerInfoAction.ADD_PLAYER);
-        setValue(packet, "b", players);
+        WrappedGameProfile profile = WrappedGameProfile.fromHandle(gprofile);
 
-        sendPacket(packet, p);
+        PlayerInfoData newData = new PlayerInfoData(profile, 1, EnumWrappers.NativeGameMode.NOT_SET, WrappedChatComponent.fromText("§8[NPC] " + gprofile.getName()));
+
+        List<PlayerInfoData> players = (List<PlayerInfoData>) packet.getPlayerInfoDataLists().read(0);
+        players.add(newData);
+
+        packet_editor.setAction(EnumWrappers.PlayerInfoAction.ADD_PLAYER);
+        packet_editor.setData(players);
+
+        try {
+            ProtocolLibrary.getProtocolManager().sendServerPacket(p, packet, false);
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
     }
 
     private void rmvFromTablist(Player p){
-        PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo();
-        PacketPlayOutPlayerInfo.PlayerInfoData data = packet.new PlayerInfoData(gameprofile, 1, WorldSettings.EnumGamemode.NOT_SET, CraftChatMessage.fromString("§8"+gameprofile.getName())[0]);
-        @SuppressWarnings("unchecked")
-        List<PacketPlayOutPlayerInfo.PlayerInfoData> players = (List<PacketPlayOutPlayerInfo.PlayerInfoData>) getValue(packet, "b");
-        players.add(data);
+        final PacketContainer packet = new PacketContainer(PacketType.Play.Server.PLAYER_INFO);
+        WrapperPlayServerPlayerInfo packet_editor = new WrapperPlayServerPlayerInfo(packet);
 
-        setValue(packet, "a", PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER);
-        setValue(packet, "b", players);
+        WrappedGameProfile profile = WrappedGameProfile.fromHandle(gameprofile);
+        PlayerInfoData newData = new PlayerInfoData(profile, 1, EnumWrappers.NativeGameMode.NOT_SET, WrappedChatComponent.fromText("§8[NPC] " + gameprofile.getName()));
 
-        sendPacket(packet, p);
+        List<PlayerInfoData> players = (List<PlayerInfoData>) packet.getPlayerInfoDataLists().read(0);
+        players.add(newData);
+
+        packet_editor.setAction(EnumWrappers.PlayerInfoAction.REMOVE_PLAYER);
+        packet_editor.setData(players);
+
+        try {
+            ProtocolLibrary.getProtocolManager().sendServerPacket(p, packet, false);
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
     }
 
-    private void rmvFromTablist(Player p, GameProfile profile){
-        PacketPlayOutPlayerInfo packet = new PacketPlayOutPlayerInfo();
-        PacketPlayOutPlayerInfo.PlayerInfoData data = packet.new PlayerInfoData(profile, 1, WorldSettings.EnumGamemode.NOT_SET, CraftChatMessage.fromString("§8"+profile.getName())[0]);
-        @SuppressWarnings("unchecked")
-        List<PacketPlayOutPlayerInfo.PlayerInfoData> players = (List<PacketPlayOutPlayerInfo.PlayerInfoData>) getValue(packet, "b");
-        players.add(data);
+    private void rmvFromTablist(Player p, GameProfile gprofile){
+        final PacketContainer packet = new PacketContainer(PacketType.Play.Server.PLAYER_INFO);
+        WrapperPlayServerPlayerInfo packet_editor = new WrapperPlayServerPlayerInfo(packet);
 
-        setValue(packet, "a", PacketPlayOutPlayerInfo.EnumPlayerInfoAction.REMOVE_PLAYER);
-        setValue(packet, "b", players);
+        WrappedGameProfile profile = WrappedGameProfile.fromHandle(gprofile);
+        PlayerInfoData newData = new PlayerInfoData(profile, 1, EnumWrappers.NativeGameMode.NOT_SET, WrappedChatComponent.fromText("§8[NPC] " + gprofile.getName()));
 
-        sendPacket(packet, p);
+        List<PlayerInfoData> players = (List<PlayerInfoData>) packet.getPlayerInfoDataLists().read(0);
+        players.add(newData);
+
+        packet_editor.setAction(EnumWrappers.PlayerInfoAction.REMOVE_PLAYER);
+        packet_editor.setData(players);
+
+        try {
+            ProtocolLibrary.getProtocolManager().sendServerPacket(p, packet, false);
+        } catch (InvocationTargetException e) {
+            e.printStackTrace();
+        }
     }
 
 
