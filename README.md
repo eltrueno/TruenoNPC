@@ -1,6 +1,9 @@
 # TruenoNPC
 API for create NPCs without nametags in Spigot/Bukkit. It's compatible with 1.8 to 1.12 versions
 
+## **NEW: Now works with ProtocolLib and its HIGHLY RECOMMENDED to use it with!!**
+
+
 **Please if you are going to use this api, give me credits c:**
 
 ## Usage
@@ -23,6 +26,7 @@ There are three events to listen: on spawn, on despawn and on interact.
 * Thanks to **aadnk** for TinyProtocol:
 https://github.com/aadnk/ProtocolLib/tree/master/modules/TinyProtocol
 * Thanks to **Yonas** for McAPI.de: https://mcapi.de/
+* Thanks to **dmulloy2** for ProtocolLib: https://github.com/dmulloy2/ProtocolLib/
 
 ## Donate me
 If you like my work, please, consider donating 
