@@ -27,6 +27,7 @@ There are three events to listen: on spawn, on despawn and on interact.
 https://github.com/aadnk/ProtocolLib/tree/master/modules/TinyProtocol
 * Thanks to **Yonas** for McAPI.de: https://mcapi.de/
 * Thanks to **dmulloy2** for ProtocolLib: https://github.com/dmulloy2/ProtocolLib/
+* Thanks to **iSnakeBuzz** for ProtocolLib version: https://github.com/iSnakeBuzz/TruenoNPC-With-ProtocolLib
 
 ## Donate me
 If you like my work, please, consider donating 
