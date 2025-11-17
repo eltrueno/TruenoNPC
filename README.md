@@ -1,3 +1,8 @@
+![Archived](https://img.shields.io/badge/Estado-Archivado-red)
+> 🚨 **Este repositorio está archivado y ya no recibe mantenimiento.**
+
+
+
 # TruenoNPC
 API for create NPCs without nametags in Spigot/Bukkit. It's compatible with 1.8 to 1.12 versions
 
